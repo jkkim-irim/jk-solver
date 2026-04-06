@@ -38,7 +38,7 @@ tkinter 기반 좌우 분할 디버깅 창:
 
 solver 및 시뮬레이션 설정 요약.
 
-![Solver Tab](_image/tab_solver.png)
+![Solver Tab](readme_image/tab_solver.png)
 
 **Solver Config:**
 
@@ -55,7 +55,7 @@ solver 및 시뮬레이션 설정 요약.
 
 body별 실시간 상태 모니터.
 
-![Objects Tab](_image/tab_objects.png)
+![Objects Tab](readme_image/tab_objects.png)
 
 각 body(box, sphere_L, sphere_R)에 대해:
 
@@ -73,7 +73,7 @@ body별 실시간 상태 모니터.
 
 접촉 파라미터 및 pair별 힘/침투 테이블.
 
-![Contact Tab](_image/tab_contact.png)
+![Contact Tab](readme_image/tab_contact.png)
 
 **Solref (from ke/kd):**
 
