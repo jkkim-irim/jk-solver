@@ -1,7 +1,37 @@
+# Python
 __pycache__/
 *.py[cod]
+*.egg-info/
+.eggs/
+
+# Virtual environments
 .venv/
 **/.venv/
 .Python
+
+# Build artifacts
 *.so
+build/
+dist/
+
+# Data artifacts (regenerable)
+*.npz
+*.mcap
+*.db3
+*.rosbag2*
+
+# IDE / Editor
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
+*~
+imgui.ini
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Claude
+.claude/

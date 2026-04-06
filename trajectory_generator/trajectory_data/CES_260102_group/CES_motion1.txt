@@ -1,0 +1,33 @@
+[clears throat] Hello, everyone.
+ My name is ALLEX, a general-purpose humanoid robot designed to move and interact safely with people.
+ Robots traditionally avoided touch because it meant risk — but humans live through it.
+ And unlike traditional robots, I don’t fear contact. I’m built for it.
+
+[pause]
+Let me start with my hands.
+ Each of my hands has 15 active degrees of freedom.
+ High-force actuators sit in my forearm, while smaller motors for fine control are embedded in my palm —
+ giving me high power in a compact, human hand-sized form.
+
+[pause]
+Let me show you hand performance using a standard thumb–finger opposition test.
+ Some people who saw my demo video even thought it was in fast-forward — but as you can see, it wasn’t.
+Beyond speed, each finger can sense small forces, generate strong fingertip force,
+ and produce a stable hook grip for lifting heavy objects.
+But the final piece of dexterity is flexibility.
+ Power is important — but dexterity comes from precision, control, and real flexibility.
+
+[pause]
+Now, let me move on to the breakthrough we achieved with the arms.
+ Inside my arms is 위-Robotics’ breakthrough actuator architecture — purpose-built for natural human-robot interaction.
+ It features one-eleventh the friction and one-twenty-fourth the inertia of conventional actuators.
+By placing five of the seven arm actuators in my upper arm, my forearm becomes lighter —
+ allowing quick, light, human-like motion.
+
+[pause]
+My waist and neck use passive gravity-compensation mechanisms that balance my upper body,
+ enabling smooth, energy-efficient, compliant movement.
+
+[thoughtful]
+That was a brief introduction to me.
+ Thank you. [happy] I’m ALLEX.
