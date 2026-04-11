@@ -23,152 +23,188 @@ from jk_solver_examples import init as jk_init
 from jk_solver_examples.debug_monitor import StatusWindow
 from jk_solver_examples.jk_solver import SolverJK
 
-# ──── Camera ────
+
+# =============================================================================
+# Constraint solref / solimp
+# =============================================================================
+
+# Equality constraint (DIP-PIP mimic coupling)
+EQ_SOLREF = (0.01, 1.0)
+EQ_SOLIMP = (0.99, 1.0, 0.001, 0.5, 2.0)
+
+# Contact — box geom
+BOX_MU = 0.5
+BOX_SOLREF = (0.01, 1.0)
+BOX_SOLIMP = (0.99, 0.99, 0.001, 0.5, 2.0)
+
+# Contact — robot geoms (all ALLEX links)
+ROBOT_MU = 0.8
+ROBOT_SOLREF = (0.01, 1.0)
+ROBOT_SOLIMP = (0.99, 0.99, 0.001, 0.5, 2.0)
+
+# =============================================================================
+# Viewer
+# =============================================================================
 CAM_POS = (0.4, 0.5, 0.15)
 CAM_PITCH = -10.0
 CAM_YAW = -90.0
 
-# ──── Timing ────
+# =============================================================================
+# Simulation
+# =============================================================================
 FPS = 200
 FRAME_DT = 1.0 / FPS
 SIM_SUBSTEPS = 10
 SIM_DT = FRAME_DT / SIM_SUBSTEPS
-
-# ──── Physics ────
 GRAVITY = 9.81
-HAND_POS = (0.0, 0.0, 0.2)          # (x, y, z) meters
-HAND_ROT_DEG = (180.0, 0.0, 0.0)      # (roll_x, pitch_y, yaw_z) degrees
 
-# ──── Solver ────
+# =============================================================================
+# Solver
+# =============================================================================
 SOLVER_ITERATIONS = 100
 SOLVER_LS_ITERATIONS = 50
 SOLVER_CONE = "elliptic"
-SOLVER_IMPRATIO = 1.0
+SOLVER_IMPRATIO = 1000.0
 
-# ──── Joint drive ────
+# =============================================================================
+# Hand transform
+# =============================================================================
+HAND_POS = (0.0, 0.0, 0.2)             # (x, y, z) meters
+HAND_ROT_DEG = (180.0, 0.0, 0.0)       # (roll_x, pitch_y, yaw_z) degrees
+
+# =============================================================================
+# Joint PD gains  (kp, kd)
+#   - real robot: 20 kHz, sim: ~2 kHz → /10 scaling
+#   - wrist: separate constants
+# =============================================================================
 WRIST_KE = 100.0
 WRIST_KD = 10.0
-
 _WRIST_JOINTS = {"R_Wrist_Yaw_Joint", "R_Wrist_Roll_Joint", "R_Wrist_Pitch_Joint"}
 
-# Per-finger-joint kp/kd from MJCF actuator spec
 HAND_JOINT_GAINS: dict[str, tuple[float, float]] = {
-    "R_Thumb_Yaw_Joint":    (40.0/10, 4.0/10),
-    "R_Thumb_CMC_Joint":    (40.0/10, 4.0/10),
-    "R_Thumb_MCP_Joint":    (20.0/10, 2.0/10),
-    "R_Index_ABAD_Joint":   (20.0/10, 2.0/10),
-    "R_Index_MCP_Joint":    (40.0/10, 4.0/10),
-    "R_Index_PIP_Joint":    (20.0/10, 2.0/10),
-    "R_Middle_ABAD_Joint":  (20.0/10, 2.0/10),
-    "R_Middle_MCP_Joint":   (40.0/10, 4.0/10),
-    "R_Middle_PIP_Joint":   (20.0/10, 2.0/10),
-    "R_Ring_ABAD_Joint":    (20.0/10, 2.0/10),
-    "R_Ring_MCP_Joint":     (40.0/10, 4.0/10),
-    "R_Ring_PIP_Joint":     (20.0/10, 2.0/10),
-    "R_Little_ABAD_Joint":  (20.0/10, 2.0/10),
-    "R_Little_MCP_Joint":   (40.0/10, 4.0/10),
-    "R_Little_PIP_Joint":   (20.0/10, 2.0/10),
+    # Thumb
+    "R_Thumb_Yaw_Joint":    (40.0/1.0, 4.0/1.0),
+    "R_Thumb_CMC_Joint":    (40.0/20.0, 4.0/20.0),
+    "R_Thumb_MCP_Joint":    (20.0/20.0, 2.0/20.0),
+    # Index
+    "R_Index_ABAD_Joint":   (20.0/1.0, 2.0/1.0),
+    "R_Index_MCP_Joint":    (40.0/20.0, 4.0/20.0),
+    "R_Index_PIP_Joint":    (20.0/20.0, 2.0/20.0),
+    # Middle
+    "R_Middle_ABAD_Joint":  (20.0/1.0, 2.0/1.0),
+    "R_Middle_MCP_Joint":   (40.0/1.0, 4.0/1.0),
+    "R_Middle_PIP_Joint":   (20.0/1.0, 2.0/1.0),
+    # Ring
+    "R_Ring_ABAD_Joint":    (20.0/1.0, 2.0/1.0),
+    "R_Ring_MCP_Joint":     (40.0/1.0, 4.0/1.0),
+    "R_Ring_PIP_Joint":     (20.0/1.0, 2.0/1.0),
+    # Little
+    "R_Little_ABAD_Joint":  (20.0/1.0, 2.0/1.0),
+    "R_Little_MCP_Joint":   (40.0/1.0, 4.0/1.0),
+    "R_Little_PIP_Joint":   (20.0/1.0, 2.0/1.0),
 }
 
-# Per-finger-joint effort limit (N·m) from MJCF
+# =============================================================================
+# Joint effort limits (N·m) — from MJCF actuator spec
+# =============================================================================
 HAND_EFFORT_LIMIT: dict[str, float] = {
-    "R_Thumb_Yaw_Joint":    2.9,
-    "R_Thumb_CMC_Joint":    4.8,
-    "R_Thumb_MCP_Joint":    4.8,
-    "R_Index_ABAD_Joint":   2.1,
-    "R_Index_MCP_Joint":    4.8,
-    "R_Index_PIP_Joint":    3.0,
-    "R_Middle_ABAD_Joint":  2.1,
-    "R_Middle_MCP_Joint":   4.8,
-    "R_Middle_PIP_Joint":   3.0,
-    "R_Ring_ABAD_Joint":    2.1,
-    "R_Ring_MCP_Joint":     4.8,
-    "R_Ring_PIP_Joint":     3.0,
-    "R_Little_ABAD_Joint":  2.1,
-    "R_Little_MCP_Joint":   4.8,
-    "R_Little_PIP_Joint":   3.0,
+    "R_Thumb_Yaw_Joint": 2.9, "R_Thumb_CMC_Joint": 4.8, "R_Thumb_MCP_Joint": 4.8,
+    "R_Index_ABAD_Joint": 2.1, "R_Index_MCP_Joint": 4.8, "R_Index_PIP_Joint": 3.0,
+    "R_Middle_ABAD_Joint": 2.1, "R_Middle_MCP_Joint": 4.8, "R_Middle_PIP_Joint": 3.0,
+    "R_Ring_ABAD_Joint": 2.1, "R_Ring_MCP_Joint": 4.8, "R_Ring_PIP_Joint": 3.0,
+    "R_Little_ABAD_Joint": 2.1, "R_Little_MCP_Joint": 4.8, "R_Little_PIP_Joint": 3.0,
 }
 
-# Per-joint position limits (rad) from MJCF ctrlrange
+# =============================================================================
+# Joint position limits (rad) — from MJCF ctrlrange
+# =============================================================================
 JOINT_LIMITS_RAD: dict[str, tuple[float, float]] = {
-    "R_Wrist_Yaw_Joint":    (-0.610865, 4.799655),    # -35° ~ 275°
-    "R_Wrist_Roll_Joint":   (-0.872665, 0.872665),    # -50° ~ 50°
-    "R_Wrist_Pitch_Joint":  (-1.396263, 1.396263),    # -80° ~ 80°
-    "R_Thumb_Yaw_Joint":    (-2.617994, 0.0),          # -150° ~ 0°
-    "R_Thumb_CMC_Joint":    (0.0, 1.570796),            # 0° ~ 90°
-    "R_Thumb_MCP_Joint":    (0.0, 1.570796),            # 0° ~ 90°
-    "R_Index_ABAD_Joint":   (-0.523599, 0.523599),      # -30° ~ 30°
-    "R_Index_MCP_Joint":    (-0.174532, 1.570796),      # -10° ~ 90°
-    "R_Index_PIP_Joint":    (0.0, 1.745329),            # 0° ~ 100°
-    "R_Middle_ABAD_Joint":  (-0.523599, 0.523599),      # -30° ~ 30°
-    "R_Middle_MCP_Joint":   (-0.174532, 1.570796),      # -10° ~ 90°
-    "R_Middle_PIP_Joint":   (0.0, 1.745329),            # 0° ~ 100°
-    "R_Ring_ABAD_Joint":    (-0.523599, 0.523599),      # -30° ~ 30°
-    "R_Ring_MCP_Joint":     (-0.174532, 1.570796),      # -10° ~ 90°
-    "R_Ring_PIP_Joint":     (0.0, 1.745329),            # 0° ~ 100°
-    "R_Little_ABAD_Joint":  (-0.523599, 0.523599),      # -30° ~ 30°
-    "R_Little_MCP_Joint":   (-0.174532, 1.570796),      # -10° ~ 90°
-    "R_Little_PIP_Joint":   (0.0, 1.745329),            # 0° ~ 100°
-    # DIP/IP follower joints — lower limit 0 (no hyperextension)
-    "R_Thumb_IP_Joint":     (0.0, 1.369),               # 0° ~ 78.4°
-    "R_Index_DIP_Joint":    (0.0, 1.483),               # 0° ~ 85°
-    "R_Middle_DIP_Joint":   (0.0, 1.483),               # 0° ~ 85°
-    "R_Ring_DIP_Joint":     (0.0, 1.483),               # 0° ~ 85°
-    "R_Little_DIP_Joint":   (0.0, 1.483),               # 0° ~ 85°
+    # Wrist
+    "R_Wrist_Yaw_Joint":   (-0.610865, 4.799655),      # -35° ~ 275°
+    "R_Wrist_Roll_Joint":  (-0.872665, 0.872665),       # -50° ~ 50°
+    "R_Wrist_Pitch_Joint": (-1.396263, 1.396263),       # -80° ~ 80°
+    # Thumb
+    "R_Thumb_Yaw_Joint":   (-2.617994, 0.0),            # -150° ~ 0°
+    "R_Thumb_CMC_Joint":   (0.0, 1.570796),             # 0° ~ 90°
+    "R_Thumb_MCP_Joint":   (0.0, 1.570796),             # 0° ~ 90°
+    # Index
+    "R_Index_ABAD_Joint":  (-0.523599, 0.523599),       # -30° ~ 30°
+    "R_Index_MCP_Joint":   (-0.174532, 1.570796),       # -10° ~ 90°
+    "R_Index_PIP_Joint":   (0.0, 1.745329),             # 0° ~ 100°
+    # Middle
+    "R_Middle_ABAD_Joint": (-0.523599, 0.523599),       # -30° ~ 30°
+    "R_Middle_MCP_Joint":  (-0.174532, 1.570796),       # -10° ~ 90°
+    "R_Middle_PIP_Joint":  (0.0, 1.745329),             # 0° ~ 100°
+    # Ring
+    "R_Ring_ABAD_Joint":   (-0.523599, 0.523599),       # -30° ~ 30°
+    "R_Ring_MCP_Joint":    (-0.174532, 1.570796),       # -10° ~ 90°
+    "R_Ring_PIP_Joint":    (0.0, 1.745329),             # 0° ~ 100°
+    # Little
+    "R_Little_ABAD_Joint": (-0.523599, 0.523599),       # -30° ~ 30°
+    "R_Little_MCP_Joint":  (-0.174532, 1.570796),       # -10° ~ 90°
+    "R_Little_PIP_Joint":  (0.0, 1.745329),             # 0° ~ 100°
+    # DIP/IP — mimic followers, lower=0 (no hyperextension)
+    "R_Thumb_IP_Joint":    (0.0, 1.369),                # 0° ~ 78.4°
+    "R_Index_DIP_Joint":   (0.0, 1.483),                # 0° ~ 85°
+    "R_Middle_DIP_Joint":  (0.0, 1.483),                # 0° ~ 85°
+    "R_Ring_DIP_Joint":    (0.0, 1.483),                # 0° ~ 85°
+    "R_Little_DIP_Joint":  (0.0, 1.483),                # 0° ~ 85°
 }
 
-# ──── Equality constraint stiffness ────
-EQ_SOLREF = (0.02, 1.0)                       # timeconst=2ms (4×sim_dt), critically damped
-EQ_SOLIMP = (0.95, 0.99, 0.0, 0.0, 1.0)     # dmax=0.99 → near-rigid coupling  
-
-# ──── Target pose (degrees) — 18 active DOFs ────
-INIT_POSE_DEG: dict[str, float] = {
-    # Wrist (3)
-    "R_Wrist_Yaw_Joint":    0.0,
-    "R_Wrist_Roll_Joint":   0.0,
-    "R_Wrist_Pitch_Joint":  -45.0,
-    # Thumb (3) — IP follows MCP via mimic
-    "R_Thumb_Yaw_Joint":    -80.0,
-    "R_Thumb_CMC_Joint":    0.0,
-    "R_Thumb_MCP_Joint":    0.0,
-    # Index (3) — DIP follows PIP via mimic
-    "R_Index_ABAD_Joint":   0.0,
-    "R_Index_MCP_Joint":    0.0,
-    "R_Index_PIP_Joint":    0.0,
-    # Middle (3)
-    "R_Middle_ABAD_Joint":  0.0,
-    "R_Middle_MCP_Joint":   90.0,
-    "R_Middle_PIP_Joint":   90.0,
-    # Ring (3)
-    "R_Ring_ABAD_Joint":    0.0,
-    "R_Ring_MCP_Joint":     90.0,
-    "R_Ring_PIP_Joint":     90.0,
-    # Little (3)
-    "R_Little_ABAD_Joint":  0.0,
-    "R_Little_MCP_Joint":   90.0,
-    "R_Little_PIP_Joint":   90.0,
-}
-
-# ──── Pinch pose (degrees) — only joints that change during pinch ────
-PINCH_POSE_DEG: dict[str, float] = {
-    "R_Thumb_CMC_Joint":   30.0,
-    "R_Thumb_MCP_Joint":   40.0,
-    "R_Index_MCP_Joint":   30.0,
-    "R_Index_PIP_Joint":   40.0,
-}
-PINCH_DURATION = 0.5  # seconds to reach pinch/open target
-
-# ──── DIP-PIP equality constraints (quartic polynomial coefficients) ────
+# =============================================================================
+# DIP-PIP mimic constraints (quartic polynomial: a0 + a1*q + a2*q² + a3*q³ + a4*q⁴)
+# =============================================================================
 _DIP_COEF = (-0.003849, 0.4269, 0.06589, 0.136, -0.04621)
 _THUMB_COEF = (-0.0015, 0.6651, 0.0186, 0.1224, -0.0696)
 
 MIMIC_CONSTRAINTS: list[tuple[str, str, tuple[float, ...]]] = [
-    ("R_Thumb_IP_Joint", "R_Thumb_MCP_Joint", _THUMB_COEF),
-    ("R_Index_DIP_Joint", "R_Index_PIP_Joint", _DIP_COEF),
-    ("R_Middle_DIP_Joint", "R_Middle_PIP_Joint", _DIP_COEF),
-    ("R_Ring_DIP_Joint", "R_Ring_PIP_Joint", _DIP_COEF),
-    ("R_Little_DIP_Joint", "R_Little_PIP_Joint", _DIP_COEF),
+    ("R_Thumb_IP_Joint",    "R_Thumb_MCP_Joint",    _THUMB_COEF),
+    ("R_Index_DIP_Joint",   "R_Index_PIP_Joint",    _DIP_COEF),
+    ("R_Middle_DIP_Joint",  "R_Middle_PIP_Joint",   _DIP_COEF),
+    ("R_Ring_DIP_Joint",    "R_Ring_PIP_Joint",     _DIP_COEF),
+    ("R_Little_DIP_Joint",  "R_Little_PIP_Joint",   _DIP_COEF),
 ]
+
+# =============================================================================
+# Target poses (degrees)
+# =============================================================================
+
+# Initial pose — 18 active DOFs
+INIT_POSE_DEG: dict[str, float] = {
+    # Wrist
+    "R_Wrist_Yaw_Joint":   0.0,
+    "R_Wrist_Roll_Joint":  0.0,
+    "R_Wrist_Pitch_Joint": -45.0,
+    # Thumb (IP follows MCP via mimic)
+    "R_Thumb_Yaw_Joint":   -80.0,
+    "R_Thumb_CMC_Joint":   0.0,
+    "R_Thumb_MCP_Joint":   0.0,
+    # Index (DIP follows PIP via mimic)
+    "R_Index_ABAD_Joint":  0.0,
+    "R_Index_MCP_Joint":   0.0,
+    "R_Index_PIP_Joint":   0.0,
+    # Middle
+    "R_Middle_ABAD_Joint": 0.0,
+    "R_Middle_MCP_Joint":  90.0,
+    "R_Middle_PIP_Joint":  90.0,
+    # Ring
+    "R_Ring_ABAD_Joint":   0.0,
+    "R_Ring_MCP_Joint":    90.0,
+    "R_Ring_PIP_Joint":    90.0,
+    # Little
+    "R_Little_ABAD_Joint": 0.0,
+    "R_Little_MCP_Joint":  90.0,
+    "R_Little_PIP_Joint":  90.0,
+}
+
+# Pinch pose — only joints that change (others keep INIT_POSE_DEG)
+PINCH_POSE_DEG: dict[str, float] = {
+    "R_Thumb_CMC_Joint":   50.0,
+    "R_Thumb_MCP_Joint":   20.0,
+    "R_Index_MCP_Joint":   30.0,
+    "R_Index_PIP_Joint":   40.0,
+}
+PINCH_DURATION = 0.5  # seconds to reach pinch/open target
 
 
 # =============================================================================
@@ -237,6 +273,38 @@ def _apply_mjc_joint_overrides(solver):
     mjw.jnt_actfrclimited.assign(jnt_actfrclimited_np)
 
 
+def _apply_contact_solref_solimp(solver, p):
+    """Override geom contact solref/solimp and friction (geometric mean)."""
+    import mujoco
+    mj = solver.mj_model
+    mjw = solver.mjw_model
+
+    solref_np = mjw.geom_solref.numpy()
+    solimp_np = mjw.geom_solimp.numpy()
+    friction_np = mjw.geom_friction.numpy()
+
+    # Geometric mean friction: both box and robot geoms set to sqrt(mu_box * mu_robot)
+    # so MuJoCo's max(mu_a, mu_b) = geomean for box<->robot contacts
+    mu_geomean = float(np.sqrt(p["box_mu"] * p["robot_mu"]))
+
+    for i in range(mj.ngeom):
+        name = mujoco.mj_id2name(mj, mujoco.mjtObj.mjOBJ_GEOM, i)
+        if name is None:
+            name = f"geom_{i}"
+        if name.startswith("shape_1"):  # box geom
+            solref_np[0, i] = p["box_solref"][:2]
+            solimp_np[0, i] = p["box_solimp"][:5]
+            friction_np[0, i, 0] = mu_geomean
+        elif "/ALLEX/" in name:  # robot geoms
+            solref_np[0, i] = p["robot_solref"][:2]
+            solimp_np[0, i] = p["robot_solimp"][:5]
+            friction_np[0, i, 0] = mu_geomean
+
+    mjw.geom_solref.assign(solref_np)
+    mjw.geom_solimp.assign(solimp_np)
+    mjw.geom_friction.assign(friction_np)
+
+
 def _build_scene(p):
     """Build Newton model with ALLEX Hand articulation."""
     builder = newton.ModelBuilder(gravity=-p["gravity"])
@@ -244,7 +312,7 @@ def _build_scene(p):
     builder.add_ground_plane()
 
     # White box
-    box_cfg = newton.ModelBuilder.ShapeConfig(mu=0.5, ke=0, kd=0, density=8593.75)  # 550g
+    box_cfg = newton.ModelBuilder.ShapeConfig(mu=0.5, ke=0, kd=0, density=400.0) 
     box_half = 0.02
     box_pos = (0.38, 0.05, box_half)
     body_box = builder.add_link(
@@ -342,6 +410,9 @@ def _build_scene(p):
     # Override joint position limits & torque limits on MuJoCo model (by joint name)
     _apply_mjc_joint_overrides(solver)
 
+    # Override contact solref/solimp for box and robot geoms
+    _apply_contact_solref_solimp(solver, p)
+
     state_0 = model.state()
     state_1 = model.state()
     control = model.control()
@@ -357,6 +428,8 @@ def _make_params():
         solver_cone=SOLVER_CONE, solver_impratio=SOLVER_IMPRATIO,
         wrist_ke=WRIST_KE, wrist_kd=WRIST_KD,
         eq_solref=list(EQ_SOLREF), eq_solimp=list(EQ_SOLIMP),
+        box_mu=BOX_MU, box_solref=list(BOX_SOLREF), box_solimp=list(BOX_SOLIMP),
+        robot_mu=ROBOT_MU, robot_solref=list(ROBOT_SOLREF), robot_solimp=list(ROBOT_SOLIMP),
     )
 
 
@@ -382,8 +455,48 @@ class Example:
         self.next_print_time = 0.0
         self._cache_joint_info()
         self._pinch_active = False
+        self._lift_active = False
         self._traj = None  # trajectory interpolation state
+        self._max_pen = {"box<->index": 0.0, "box<->thumb": 0.0}
+        self._cache_geom_groups()
         self._status_window = StatusWindow(geom_labels=[])
+
+    def _cache_geom_groups(self):
+        """Cache geom index sets for box, index finger, and thumb."""
+        import mujoco
+        mj = self.solver.mj_model
+        self._box_geoms = set()
+        self._index_geoms = set()
+        self._thumb_geoms = set()
+        for i in range(mj.ngeom):
+            bname = mujoco.mj_id2name(mj, mujoco.mjtObj.mjOBJ_BODY, mj.geom_bodyid[i]) or ""
+            if "box" in bname:
+                self._box_geoms.add(i)
+            elif "Index" in bname:
+                self._index_geoms.add(i)
+            elif "Thumb" in bname:
+                self._thumb_geoms.add(i)
+
+    def _get_contact_penetration(self):
+        """Return current penetration depth for box<->index and box<->thumb pairs."""
+        d = self.solver.mjw_data
+        nacon = int(d.nacon.numpy()[0])
+        pen_index, pen_thumb = 0.0, 0.0
+        if nacon > 0:
+            contact_geom = d.contact.geom.numpy()[:nacon]
+            contact_dist = d.contact.dist.numpy()[:nacon]
+            for c in range(nacon):
+                g0, g1 = int(contact_geom[c, 0]), int(contact_geom[c, 1])
+                pen = -float(contact_dist[c])  # positive = penetration
+                is_box = g0 in self._box_geoms or g1 in self._box_geoms
+                if not is_box:
+                    continue
+                other = g1 if g0 in self._box_geoms else g0
+                if other in self._index_geoms:
+                    pen_index = max(pen_index, pen)
+                elif other in self._thumb_geoms:
+                    pen_thumb = max(pen_thumb, pen)
+        return pen_index, pen_thumb
 
     def _cache_joint_info(self):
         """Cache joint labels, q_start (for qpos), and qd_start (for joint_target_pos)."""
@@ -401,8 +514,11 @@ class Example:
         self.viewer.reset_model(self.model)
         self.viewer.set_camera(pos=wp.vec3(*CAM_POS), pitch=CAM_PITCH, yaw=CAM_YAW)
         self._cache_joint_info()
+        self._cache_geom_groups()
         self._pinch_active = False
+        self._lift_active = False
         self._traj = None
+        self._max_pen = {"box<->index": 0.0, "box<->thumb": 0.0}
         self.sim_time = 0.0
         self.next_print_time = 0.0
         self._status_window.clear_joint_data()
@@ -417,6 +533,11 @@ class Example:
         if imgui.button(label):
             self._pinch_active = not self._pinch_active
             self._apply_pinch_target()
+        imgui.same_line()
+        lift_label = "Lift [ON]" if self._lift_active else "Lift"
+        if imgui.button(lift_label):
+            self._lift_active = not self._lift_active
+            self._apply_lift_target()
         imgui.separator()
 
         imgui.text("=== Solver ===")
@@ -450,6 +571,23 @@ class Example:
                     qd = self._joint_qd_starts[i]
                     goal_pos[qd] = np.radians(deg)
                     break
+        self._traj = {
+            "start": current_pos,
+            "goal": goal_pos,
+            "t0": self.sim_time,
+            "duration": PINCH_DURATION,
+        }
+
+    def _apply_lift_target(self):
+        """Start trajectory interpolation: wrist pitch to 0° (lift) or back to INIT."""
+        current_pos = self.control.joint_target_pos.numpy().copy()
+        goal_pos = current_pos.copy()
+        deg = 0.0 if self._lift_active else INIT_POSE_DEG.get("R_Wrist_Pitch_Joint", 0.0)
+        for i, lbl in enumerate(self._joint_labels):
+            if lbl.endswith("R_Wrist_Pitch_Joint"):
+                qd = self._joint_qd_starts[i]
+                goal_pos[qd] = np.radians(deg)
+                break
         self._traj = {
             "start": current_pos,
             "goal": goal_pos,
@@ -495,6 +633,17 @@ class Example:
             hit_limit=hit, no_contact=(nacon == 0))
         self._status_window.update_conv_summary(
             f"[current]  niter={niter}/{max_iter}  nacon={nacon}  nefc={nefc}")
+
+        # Contact penetration (update every substep)
+        pen_idx, pen_thm = self._get_contact_penetration()
+        self._max_pen["box<->index"] = max(self._max_pen["box<->index"], pen_idx)
+        self._max_pen["box<->thumb"] = max(self._max_pen["box<->thumb"], pen_thm)
+        self._status_window.update({"contact": (
+            f"── Contact Penetration (t={self.sim_time:.3f}s) ──\n"
+            f"  {'Pair':<20s} {'Pen(mm)':>10s} {'Max_Pen(mm)':>12s}\n"
+            f"  {'box<->index':<20s} {pen_idx*1000:>10.4f} {self._max_pen['box<->index']*1000:>12.4f}\n"
+            f"  {'box<->thumb':<20s} {pen_thm*1000:>10.4f} {self._max_pen['box<->thumb']*1000:>12.4f}"
+        )})
 
         # Index DIP constraint data (efc type=0 are equality constraints, Index DIP is 2nd)
         if nefc > 0:
