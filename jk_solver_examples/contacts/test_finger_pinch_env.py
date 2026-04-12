@@ -29,18 +29,18 @@ from jk_solver_examples.jk_solver import SolverJK
 # =============================================================================
 
 # Equality constraint (DIP-PIP mimic coupling)
-EQ_SOLREF = (0.01, 1.0)
-EQ_SOLIMP = (0.99, 1.0, 0.001, 0.5, 2.0)
+EQ_SOLREF = (0.001, 3.0)                          # timeconst=5ms, critically damped
+EQ_SOLIMP = (0.9, 0.95, 0.001, 0.5, 1.0)       # tight impedance
 
 # Contact — box geom
 BOX_MU = 0.5
-BOX_SOLREF = (0.01, 1.0)
-BOX_SOLIMP = (0.99, 0.99, 0.001, 0.5, 2.0)
+BOX_SOLREF = (0.02, 1.0)
+BOX_SOLIMP = (0.9, 0.95, 0.001, 0.5, 2.0)
 
 # Contact — robot geoms (all ALLEX links)
 ROBOT_MU = 0.8
-ROBOT_SOLREF = (0.01, 1.0)
-ROBOT_SOLIMP = (0.99, 0.99, 0.001, 0.5, 2.0)
+ROBOT_SOLREF = (0.02, 1.0)
+ROBOT_SOLIMP = (0.9, 0.95, 0.001, 0.5, 2.0)
 
 # =============================================================================
 # Viewer
@@ -54,17 +54,21 @@ CAM_YAW = -90.0
 # =============================================================================
 FPS = 200
 FRAME_DT = 1.0 / FPS
-SIM_SUBSTEPS = 10
+SIM_SUBSTEPS = 4
 SIM_DT = FRAME_DT / SIM_SUBSTEPS
 GRAVITY = 9.81
 
 # =============================================================================
 # Solver
 # =============================================================================
-SOLVER_ITERATIONS = 100
-SOLVER_LS_ITERATIONS = 50
+SOLVER_ITERATIONS = 200
+SOLVER_LS_ITERATIONS = 100
 SOLVER_CONE = "elliptic"
-SOLVER_IMPRATIO = 1000.0
+SOLVER_IMPRATIO = 10.0
+SOLVER_TOLERANCE = 1e-20          # float32 min positive (~1.4e-45), max precision
+SOLVER_LS_TOLERANCE = 1e-20       # float32 min positive, max precision
+SOLVER_CCD_ITERATIONS = 300       # convex collision detection (default 35)
+SOLVER_CCD_TOLERANCE = 1e-7       # CCD precision (default 1e-6, float32 limit)
 
 # =============================================================================
 # Hand transform
@@ -83,13 +87,13 @@ _WRIST_JOINTS = {"R_Wrist_Yaw_Joint", "R_Wrist_Roll_Joint", "R_Wrist_Pitch_Joint
 
 HAND_JOINT_GAINS: dict[str, tuple[float, float]] = {
     # Thumb
-    "R_Thumb_Yaw_Joint":    (40.0/1.0, 4.0/1.0),
-    "R_Thumb_CMC_Joint":    (40.0/20.0, 4.0/20.0),
-    "R_Thumb_MCP_Joint":    (20.0/20.0, 2.0/20.0),
+    "R_Thumb_Yaw_Joint":    (40.0, 4.0),
+    "R_Thumb_CMC_Joint":    (40.0/1.0, 4.0/1.0),
+    "R_Thumb_MCP_Joint":    (20.0/10.0, 2.0/10.0),
     # Index
-    "R_Index_ABAD_Joint":   (20.0/1.0, 2.0/1.0),
-    "R_Index_MCP_Joint":    (40.0/20.0, 4.0/20.0),
-    "R_Index_PIP_Joint":    (20.0/20.0, 2.0/20.0),
+    "R_Index_ABAD_Joint":   (20.0, 2.0),
+    "R_Index_MCP_Joint":    (40.0/1.0, 4.0/1.0),
+    "R_Index_PIP_Joint":    (20.0/10.0, 2.0/10.0),
     # Middle
     "R_Middle_ABAD_Joint":  (20.0/1.0, 2.0/1.0),
     "R_Middle_MCP_Joint":   (40.0/1.0, 4.0/1.0),
@@ -177,12 +181,12 @@ INIT_POSE_DEG: dict[str, float] = {
     "R_Wrist_Pitch_Joint": -45.0,
     # Thumb (IP follows MCP via mimic)
     "R_Thumb_Yaw_Joint":   -80.0,
-    "R_Thumb_CMC_Joint":   0.0,
-    "R_Thumb_MCP_Joint":   0.0,
+    "R_Thumb_CMC_Joint":   30.0,
+    "R_Thumb_MCP_Joint":   15.0,
     # Index (DIP follows PIP via mimic)
     "R_Index_ABAD_Joint":  0.0,
-    "R_Index_MCP_Joint":   0.0,
-    "R_Index_PIP_Joint":   0.0,
+    "R_Index_MCP_Joint":   20.0,
+    "R_Index_PIP_Joint":   25.0,
     # Middle
     "R_Middle_ABAD_Joint": 0.0,
     "R_Middle_MCP_Joint":  90.0,
@@ -312,7 +316,7 @@ def _build_scene(p):
     builder.add_ground_plane()
 
     # White box
-    box_cfg = newton.ModelBuilder.ShapeConfig(mu=0.5, ke=0, kd=0, density=400.0) 
+    box_cfg = newton.ModelBuilder.ShapeConfig(mu=0.5, ke=0, kd=0, density=4000.0) 
     box_half = 0.02
     box_pos = (0.38, 0.05, box_half)
     body_box = builder.add_link(
@@ -413,6 +417,16 @@ def _build_scene(p):
     # Override contact solref/solimp for box and robot geoms
     _apply_contact_solref_solimp(solver, p)
 
+    # Override solver tolerances
+    solver.mjw_model.opt.tolerance.fill_(p["solver_tolerance"])
+    solver.mjw_model.opt.ls_tolerance.fill_(p["solver_ls_tolerance"])
+    solver.mj_model.opt.tolerance = p["solver_tolerance"]
+    solver.mj_model.opt.ls_tolerance = p["solver_ls_tolerance"]
+    solver.mjw_model.opt.ccd_iterations = p["solver_ccd_iterations"]
+    solver.mj_model.opt.ccd_iterations = p["solver_ccd_iterations"]
+    solver.mjw_model.opt.ccd_tolerance.fill_(p["solver_ccd_tolerance"])
+    solver.mj_model.opt.ccd_tolerance = p["solver_ccd_tolerance"]
+
     state_0 = model.state()
     state_1 = model.state()
     control = model.control()
@@ -426,6 +440,9 @@ def _make_params():
         hand_pos=HAND_POS, hand_rot_deg=HAND_ROT_DEG,
         solver_iterations=SOLVER_ITERATIONS, solver_ls_iterations=SOLVER_LS_ITERATIONS,
         solver_cone=SOLVER_CONE, solver_impratio=SOLVER_IMPRATIO,
+        solver_tolerance=SOLVER_TOLERANCE, solver_ls_tolerance=SOLVER_LS_TOLERANCE,
+        solver_ccd_iterations=SOLVER_CCD_ITERATIONS,
+        solver_ccd_tolerance=SOLVER_CCD_TOLERANCE,
         wrist_ke=WRIST_KE, wrist_kd=WRIST_KD,
         eq_solref=list(EQ_SOLREF), eq_solimp=list(EQ_SOLIMP),
         box_mu=BOX_MU, box_solref=list(BOX_SOLREF), box_solimp=list(BOX_SOLIMP),
